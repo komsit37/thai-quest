@@ -447,6 +447,151 @@
     font-size: 14px;
   }
 
+  /* Placement test */
+  .placement-screen { display: none; }
+
+  .placement-card {
+    background: linear-gradient(145deg, rgba(253, 246, 227, 0.08), rgba(253, 246, 227, 0.03));
+    border: 1px solid rgba(244, 196, 48, 0.3);
+    border-radius: 24px;
+    padding: 28px 24px;
+    backdrop-filter: blur(10px);
+    margin-top: 16px;
+    animation: sceneIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .placement-step {
+    font-size: 12px;
+    color: var(--amulet);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+    font-weight: 800;
+  }
+
+  .placement-question {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    line-height: 1.3;
+    color: var(--cream);
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+
+  .placement-hint {
+    font-size: 14px;
+    color: var(--amulet);
+    font-style: italic;
+    margin-bottom: 16px;
+  }
+
+  .big-listen-btn {
+    background: linear-gradient(135deg, var(--orchid), var(--sunset));
+    color: var(--cream);
+    border: none;
+    padding: 24px;
+    border-radius: 20px;
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 8px 20px rgba(196, 69, 105, 0.3);
+    transition: all 0.2s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .big-listen-btn:hover { transform: translateY(-2px); }
+  .big-listen-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+
+  .placement-options {
+    display: grid;
+    gap: 10px;
+  }
+
+  .placement-option {
+    background: rgba(253, 246, 227, 0.95);
+    border: 3px solid transparent;
+    padding: 18px 20px;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    color: var(--ink);
+  }
+
+  .placement-option:hover { transform: translateX(4px); border-color: var(--gold); }
+  .placement-option.selected { background: var(--gold); border-color: var(--gold-deep); }
+
+  .placement-option .thai-big {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    color: var(--orchid);
+    margin-right: 10px;
+  }
+
+  .listen-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .listen-pair button {
+    background: linear-gradient(135deg, var(--leaf), var(--jungle-mid));
+    color: var(--cream);
+    border: 2px solid var(--gold);
+    padding: 20px;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .listen-pair button:active { transform: scale(0.96); }
+
+  .placement-progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .placement-progress .pip {
+    flex: 1;
+    height: 6px;
+    background: rgba(244, 196, 48, 0.2);
+    border-radius: 3px;
+    transition: background 0.4s;
+  }
+
+  .placement-progress .pip.done { background: var(--gold); }
+  .placement-progress .pip.current { background: var(--amulet); }
+
+  .level-result {
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .level-badge {
+    display: inline-block;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--gold), var(--amulet));
+    color: var(--ink);
+    border-radius: 999px;
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 16px 0;
+  }
+
   /* Tooltip for Thai words */
   .word-tooltip {
     position: absolute;
@@ -503,6 +648,11 @@
     <div id="setupError"></div>
   </div>
 
+  <!-- PLACEMENT TEST SCREEN -->
+  <div id="placement" class="placement-screen">
+    <div id="placementContent"></div>
+  </div>
+
   <!-- STORY SCREEN -->
   <div id="story" class="story-screen">
     <div class="progress-bar" id="progressBar"></div>
@@ -537,9 +687,11 @@ const STATE = {
   chapter: 1,
   vocabLearned: new Set(JSON.parse(localStorage.getItem('tq_vocab') || '[]')),
   xp: parseInt(localStorage.getItem('tq_xp') || '0'),
+  level: localStorage.getItem('tq_level') || null,  // 'beginner' | 'some-exposure' | 'reader'
   storySoFar: '',
   currentChapter: null,
   currentSceneIdx: 0,
+  placementAnswers: [],
 };
 
 const MODEL = 'google/gemini-2.5-flash';
@@ -574,12 +726,357 @@ async function startAdventure() {
   localStorage.setItem('tq_apiKey', STATE.apiKey);
 
   document.getElementById('setup').style.display = 'none';
+
+  // Skip placement if already calibrated previously
+  if (STATE.level) {
+    enterStory();
+  } else {
+    document.getElementById('placement').style.display = 'block';
+    runPlacement(0);
+  }
+}
+
+function enterStory() {
+  document.getElementById('placement').style.display = 'none';
   document.getElementById('story').style.display = 'block';
   document.getElementById('stats').style.display = 'flex';
   updateStats();
-
-  await generateChapter();
+  generateChapter();
 }
+
+// ============================================================
+// PLACEMENT TEST
+// ============================================================
+
+const PLACEMENT_SETS = [
+  // SET A
+  [
+    {
+      type: 'self-report',
+      question: 'Have you heard Thai before?',
+      hint: 'Just pick what feels true!',
+      options: [
+        { label: '🌱 Never — totally new!', score: 0 },
+        { label: '👂 A little bit', score: 1 },
+        { label: '🗣️ Yes, I know some words', score: 2 },
+        { label: '📖 Yes, I can read some Thai', score: 3 },
+      ]
+    },
+    {
+      type: 'listen-meaning',
+      question: 'Tap to listen, then pick what it means.',
+      hint: '🔊 Listen carefully!',
+      thai: 'สวัสดี',
+      options: [
+        { label: 'Hello 👋', correct: true },
+        { label: 'Goodbye 🚪', correct: false },
+        { label: 'Thank you 🙏', correct: false },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'visual-match',
+      question: 'Which word means "elephant"?',
+      hint: 'Take a guess if you don\'t know!',
+      options: [
+        { label: 'น้ำ', meaning: 'water', correct: false },
+        { label: 'ช้าง', meaning: 'elephant', correct: true },
+        { label: 'ป่า', meaning: 'jungle', correct: false },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'tone-pair',
+      question: 'Tap both buttons. Do they sound the same or different?',
+      hint: '🎵 Listen for the music in the voice',
+      sample1: 'มา',
+      sample2: 'ม้า',
+      options: [
+        { label: '🟰 Exactly the same', correct: false },
+        { label: '🎵 Different — different tones', correct: true },
+        { label: '🤔 Not sure', correct: null },
+      ]
+    },
+    {
+      type: 'self-report',
+      question: 'How long can you read on your own?',
+      hint: 'Be honest — this helps us pick the right stories!',
+      options: [
+        { label: '📕 Just a few words', score: 0 },
+        { label: '📗 Short sentences', score: 1 },
+        { label: '📘 A whole short story', score: 2 },
+        { label: '📚 Long chapter books', score: 3 },
+      ]
+    },
+  ],
+
+  // SET B
+  [
+    {
+      type: 'self-report',
+      question: 'How much Thai do you already know?',
+      hint: 'No wrong answers!',
+      options: [
+        { label: '🌱 Zero — starting fresh', score: 0 },
+        { label: '🍃 A handful of words', score: 1 },
+        { label: '🌿 Lots of words and short phrases', score: 2 },
+        { label: '🌳 I can have small chats', score: 3 },
+      ]
+    },
+    {
+      type: 'listen-meaning',
+      question: 'Tap to listen. What does this word mean?',
+      hint: '🔊 Tap the speaker first!',
+      thai: 'ขอบคุณ',
+      options: [
+        { label: 'Thank you 🙏', correct: true },
+        { label: 'Sorry 😅', correct: false },
+        { label: 'Hello 👋', correct: false },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'visual-match',
+      question: 'Which word means "water"?',
+      hint: 'Look at the shapes — see if any feel familiar.',
+      options: [
+        { label: 'ช้าง', meaning: 'elephant', correct: false },
+        { label: 'เพื่อน', meaning: 'friend', correct: false },
+        { label: 'น้ำ', meaning: 'water', correct: true },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'tone-pair',
+      question: 'Tap both. Do these two sounds match?',
+      hint: '🎵 Tones change the meaning in Thai!',
+      sample1: 'คา',
+      sample2: 'ค่า',
+      options: [
+        { label: '🟰 They sound the same', correct: false },
+        { label: '🎵 Different tones', correct: true },
+        { label: '🤔 Hard to tell', correct: null },
+      ]
+    },
+    {
+      type: 'self-report',
+      question: 'Which book sounds most like what you read?',
+      hint: 'Pick what fits best!',
+      options: [
+        { label: '🐛 Picture books with big words', score: 0 },
+        { label: '🐰 Easy readers (Frog and Toad)', score: 1 },
+        { label: '🪄 Chapter books (Magic Tree House)', score: 2 },
+        { label: '🧙 Big novels (Harry Potter)', score: 3 },
+      ]
+    },
+  ],
+
+  // SET C
+  [
+    {
+      type: 'self-report',
+      question: 'Has anyone ever spoken Thai with you?',
+      hint: 'Family, friends, anyone!',
+      options: [
+        { label: '🚫 Nope, not really', score: 0 },
+        { label: '👋 A few times', score: 1 },
+        { label: '🏡 Sometimes at home', score: 2 },
+        { label: '🗣️ Often — I hear it a lot', score: 3 },
+      ]
+    },
+    {
+      type: 'listen-meaning',
+      question: 'Tap to listen. What does this mean?',
+      hint: '🔊 Listen first!',
+      thai: 'เพื่อน',
+      options: [
+        { label: 'Friend 🤝', correct: true },
+        { label: 'Family 👨‍👩‍👧', correct: false },
+        { label: 'Teacher 👩‍🏫', correct: false },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'visual-match',
+      question: 'Which word means "jungle"?',
+      hint: 'Guess if you\'re not sure!',
+      options: [
+        { label: 'ป่า', meaning: 'jungle', correct: true },
+        { label: 'น้ำ', meaning: 'water', correct: false },
+        { label: 'ช้าง', meaning: 'elephant', correct: false },
+        { label: "I don't know 🤷", correct: null },
+      ]
+    },
+    {
+      type: 'tone-pair',
+      question: 'Tap each one. Same word or different?',
+      hint: '🎵 Even tiny tone changes matter!',
+      sample1: 'ไม',
+      sample2: 'ไม่',
+      options: [
+        { label: '🟰 Same exactly', correct: false },
+        { label: '🎵 Different tone', correct: true },
+        { label: '🤔 Not sure', correct: null },
+      ]
+    },
+    {
+      type: 'self-report',
+      question: 'When you read out loud, how do you feel?',
+      hint: 'Be honest!',
+      options: [
+        { label: '😬 Tricky — I sound out lots', score: 0 },
+        { label: '🙂 Pretty okay with easy stuff', score: 1 },
+        { label: '😎 Smooth on most things', score: 2 },
+        { label: '🚀 Fast and easy', score: 3 },
+      ]
+    },
+  ],
+];
+
+// Pick a fresh set each time, avoiding the most recently used one
+function pickPlacementSet() {
+  const lastSetIdx = parseInt(localStorage.getItem('tq_lastPlacementSet') ?? '-1');
+  const choices = [0, 1, 2].filter(i => i !== lastSetIdx);
+  const setIdx = choices[Math.floor(Math.random() * choices.length)];
+  localStorage.setItem('tq_lastPlacementSet', String(setIdx));
+
+  // Shuffle the questions within the set, plus shuffle options inside each question
+  const set = PLACEMENT_SETS[setIdx].map(q => {
+    const shuffledOptions = shuffle([...q.options]);
+    return { ...q, options: shuffledOptions };
+  });
+  return shuffle(set);
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Active questions for current placement run (set when test starts)
+let ACTIVE_PLACEMENT = [];
+
+function renderPlacementProgress(idx) {
+  const total = ACTIVE_PLACEMENT.length;
+  let html = '<div class="placement-progress">';
+  for (let i = 0; i < total; i++) {
+    const cls = i < idx ? 'pip done' : (i === idx ? 'pip current' : 'pip');
+    html += `<div class="${cls}"></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function runPlacement(idx) {
+  // Lazy-init the active set on the first question
+  if (idx === 0 && ACTIVE_PLACEMENT.length === 0) {
+    ACTIVE_PLACEMENT = pickPlacementSet();
+    STATE.placementAnswers = [];
+  }
+
+  if (idx >= ACTIVE_PLACEMENT.length) {
+    return finishPlacement();
+  }
+
+  const q = ACTIVE_PLACEMENT[idx];
+  const container = document.getElementById('placementContent');
+  let inner = '';
+
+  inner += renderPlacementProgress(idx);
+  inner += `<div class="placement-card">`;
+  inner += `<div class="placement-step">Calibration ${idx + 1} of ${ACTIVE_PLACEMENT.length}</div>`;
+  inner += `<div class="placement-question">${escapeHtml(q.question)}</div>`;
+
+  if (q.type === 'listen-meaning') {
+    inner += `<button class="big-listen-btn" onclick="speak('${escapeJs(q.thai)}')">🔊 Tap to listen</button>`;
+  } else if (q.type === 'tone-pair') {
+    inner += `<div class="listen-pair">
+      <button onclick="speak('${escapeJs(q.sample1)}')">🔊 Sound A</button>
+      <button onclick="speak('${escapeJs(q.sample2)}')">🔊 Sound B</button>
+    </div>`;
+  }
+
+  if (q.hint) inner += `<div class="placement-hint">${escapeHtml(q.hint)}</div>`;
+
+  inner += `<div class="placement-options">`;
+  q.options.forEach((opt, i) => {
+    const label = opt.meaning
+      ? `<span class="thai-big">${escapeHtml(opt.label)}</span>`
+      : escapeHtml(opt.label);
+    inner += `<button class="placement-option" onclick="answerPlacement(${idx}, ${i})">${label}</button>`;
+  });
+  inner += `</div></div>`;
+
+  container.innerHTML = inner;
+}
+
+window.answerPlacement = function(qIdx, optIdx) {
+  STATE.placementAnswers[qIdx] = optIdx;
+
+  const buttons = document.querySelectorAll('.placement-option');
+  buttons[optIdx].classList.add('selected');
+  buttons.forEach(b => b.disabled = true);
+
+  setTimeout(() => runPlacement(qIdx + 1), 350);
+};
+
+function finishPlacement() {
+  let score = 0;
+  ACTIVE_PLACEMENT.forEach((q, i) => {
+    const ansIdx = STATE.placementAnswers[i];
+    if (ansIdx == null) return;
+    const opt = q.options[ansIdx];
+
+    if (q.type === 'self-report') {
+      score += opt.score || 0;
+    } else if (opt.correct === true) {
+      score += 2;
+    } else if (opt.correct === null) {
+      score += 0;
+    } else {
+      score += 0;
+    }
+  });
+
+  let level, levelLabel, levelBlurb;
+  if (score <= 3) {
+    level = 'beginner';
+    levelLabel = '🌱 Brand New Explorer';
+    levelBlurb = "We'll start with the very basics. You'll learn easy words and hear them lots.";
+  } else if (score <= 7) {
+    level = 'some-exposure';
+    levelLabel = '🌿 Curious Adventurer';
+    levelBlurb = "You know a bit already! We'll mix easy and a little harder Thai.";
+  } else {
+    level = 'reader';
+    levelLabel = '🌳 Jungle Ranger';
+    levelBlurb = "Wow, you're ahead! We'll use more Thai script and trickier words.";
+  }
+
+  STATE.level = level;
+  localStorage.setItem('tq_level', level);
+
+  // Reset for any future re-take
+  ACTIVE_PLACEMENT = [];
+
+  document.getElementById('placementContent').innerHTML = `
+    ${renderPlacementProgress(STATE.placementAnswers.length)}
+    <div class="placement-card level-result">
+      <div class="placement-step">Your starting level</div>
+      <div class="level-badge">${levelLabel}</div>
+      <p style="color:var(--cream); font-size:16px; line-height:1.5; margin-bottom:24px;">${levelBlurb}</p>
+      <button class="btn-primary" onclick="enterStory()">Begin the Adventure ✨</button>
+    </div>
+  `;
+}
+
+window.enterStory = enterStory;
+
+
 
 // ============================================================
 // STORY DIRECTOR — Prompt Construction
@@ -609,13 +1106,40 @@ function buildChapterPrompt() {
     { thai: 'สาม', roman: 'saam', en: 'three' },
   ];
 
-  // Pick 3 fresh vocab targets the kid hasn't learned yet
+  // Pick fresh vocab targets the kid hasn't learned yet
   const fresh = vocabPool.filter(w => !STATE.vocabLearned.has(w.thai));
-  const targets = (fresh.length >= 3 ? fresh : vocabPool).slice(0, 3);
+
+  // Difficulty profile by level
+  const levelProfiles = {
+    'beginner': {
+      targetCount: 1,
+      label: 'beginner (totally new to Thai)',
+      guide: 'Use ONE simple Thai word per chapter. Always show the English meaning right next to the Thai. Keep sentences very short (under 10 words). Repeat the target word at least 3 times across the scenes. Lesson should test recognition only, not recall.',
+      sceneWords: '~25 words per scene'
+    },
+    'some-exposure': {
+      targetCount: 2,
+      label: 'some exposure (knows a few words)',
+      guide: 'Use 2 Thai words. Show meaning the first time only, then use the Thai word naturally. Sentences moderate length. Lesson can ask kid to pick the right Thai word.',
+      sceneWords: '~40 words per scene'
+    },
+    'reader': {
+      targetCount: 3,
+      label: 'reader (comfortable with Thai script)',
+      guide: 'Use 3 Thai words. Less hand-holding with translations — kids can figure it out from context. Lesson can test reading the Thai script directly.',
+      sceneWords: '~55 words per scene'
+    }
+  };
+
+  const profile = levelProfiles[STATE.level] || levelProfiles['beginner'];
+  const targets = (fresh.length >= profile.targetCount ? fresh : vocabPool).slice(0, profile.targetCount);
 
   return {
     targets,
     prompt: `You are the Story Director for "Thai Quest", an adventure game teaching Thai to an 8-year-old named ${STATE.kidName} who loves ${interestList}.
+
+LEARNER LEVEL: ${profile.label}
+DIFFICULTY GUIDANCE: ${profile.guide}
 
 WORLD: A magical parallel Thailand. ${STATE.kidName} found a glowing amulet and got pulled into a jungle realm where mythical creatures and friendly villagers speak Thai. Their guide is Nong, a clever 8-year-old Thai kid who knows the jungle. Their sidekick is Pim, a tiny mischievous elephant.
 
@@ -633,7 +1157,7 @@ WRITE A SHORT CHAPTER with this exact structure as JSON:
   "scenes": [
     {
       "emoji": "single emoji representing the scene",
-      "narration": "2-3 sentences, present tense, kid-friendly, ~40 words",
+      "narration": "${profile.sceneWords}, present tense, kid-friendly. Length appropriate for ${profile.label}.",
       "dialogue": [
         {"speaker": "Nong" or "Pim" or "${STATE.kidName}", "line": "spoken line, may include Thai words inline like 'Let's say สวัสดี (hello)!'"}
       ]
@@ -641,7 +1165,7 @@ WRITE A SHORT CHAPTER with this exact structure as JSON:
   ],
   "lesson": {
     "tag": "VOCAB" or "TONE" or "LISTENING",
-    "prompt": "kid-friendly question setting up a story moment, e.g. 'The vendor asks for the magic word. What do you say to thank her?'",
+    "prompt": "kid-friendly question setting up a story moment",
     "thaiWord": "the Thai word being tested",
     "roman": "romanization",
     "english": "english meaning",
@@ -650,17 +1174,17 @@ WRITE A SHORT CHAPTER with this exact structure as JSON:
     "successLine": "celebration line from Nong or Pim after correct answer",
     "failHint": "gentle hint if they get it wrong"
   },
-  "summary": "1 sentence summary of what happened, for the next chapter to reference",
+  "summary": "1 sentence summary of what happened",
   "cliffhanger": "1 short sentence ending — 'Suddenly...' style"
 }
 
 REQUIREMENTS:
-- 3 scenes only. Keep each scene short.
+- 3 scenes only.
 - The lesson must use one of the LEARNING TARGETS.
 - Shuffle the options array; set correctIndex to where the correct answer ended up.
 - Mention ${STATE.kidName}'s interests (${interestList}) somewhere if it fits naturally.
 - Be playful, mysterious, fun. Avoid scary content.
-- Keep sentences short — for an 8-year-old reader.
+- Match the difficulty guidance above strictly.
 - Return ONLY valid JSON, no markdown fences, no commentary.`
   };
 }
