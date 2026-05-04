@@ -13,6 +13,15 @@ export function startThaiQuestApp(){
   document.querySelectorAll('[data-interest]').forEach(b=>{if((s.interests||[]).includes(b.dataset.interest))b.classList.add('selected')});
   $('#interests').onclick=e=>{const b=e.target.closest('[data-interest]');if(b)b.classList.toggle('selected')};
   $('#startBtn').onclick=start;
+  const continueBtn=$('#continueBtn');
+  if(continueBtn&&hasChapterCheckpoint(s)&&s.currentChapter){continueBtn.style.display='block';continueBtn.onclick=resumeAdventure;setTimeout(resumeAdventure,250)}
+
+  async function resumeAdventure(){
+    $('#setup').style.display='none';
+    $('#story').style.display='block';
+    updateStats();
+    await load();
+  }
 
   async function start(){
     s.apiKey=$('#apiKey').value.trim();
